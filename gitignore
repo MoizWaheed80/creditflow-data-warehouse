@@ -1,0 +1,21 @@
+# Real secrets, never commit
+source/odoo/config/odoo.conf
+*.env
+.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Power BI local cache
+*.pbix.bak

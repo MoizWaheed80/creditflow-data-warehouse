@@ -25,5 +25,3 @@ SQL Server, SSIS, dlt, Python, Power BI, Odoo (self-hosted), HubSpot API, Docker
 ## Setup
 See `docs/SRS.md` for full requirements. Odoo setup instructions in `infra/odoo/`.
 
-## Demo
-_(video walkthrough link goes here once the report is built)_

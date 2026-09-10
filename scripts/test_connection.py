@@ -1,10 +1,9 @@
 import xmlrpc.client
 
-# Update these to match what you set when creating the database in step 6
 url = "http://localhost:8069"
-db = "creditflow"
-username = "admin"
-password = "your_admin_password"
+db = "odoo_creditflow"
+username = "theclassictech@gmail.com"
+password = "admin"
 
 common = xmlrpc.client.ServerProxy(f"{url}/xmlrpc/2/common")
 print("Odoo version info:", common.version())

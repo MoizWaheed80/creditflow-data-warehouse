@@ -1,5 +1,7 @@
 # Real secrets, never commit
 source/odoo/config/odoo.conf
+source/salesforce/config/salesforce_config.json
+
 *.env
 .env
 

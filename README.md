@@ -23,5 +23,9 @@ Excel (manual) ──SSIS─┘
 SQL Server, SSIS, dlt, Python, Power BI, Odoo (self-hosted), HubSpot API, Docker.
 
 ## Setup
-See `docs/SRS.md` for full requirements. Odoo setup instructions in `infra/odoo/`.
+See `docs/SRS.md` for full requirements.
+
+problem statment,
+sdlc,
+
 

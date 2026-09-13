@@ -27,5 +27,6 @@ See `docs/SRS.md` for full requirements.
 
 problem statment,
 sdlc,
+make doc
 
 

@@ -1,0 +1,7 @@
+dlt[mssql]
+pandas
+openpyxl
+simple-salesforce
+psycopg2-binary
+sqlalchemy
+pyodbc

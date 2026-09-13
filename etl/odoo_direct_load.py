@@ -1,41 +1,4 @@
-"""
-Ingestion method 3 of 3: DIRECT DB-to-DB (no dlt)
-Reads straight out of the Odoo Postgres database and writes straight into
-SQL Server (schema: raw_odoo). No framework, no incremental state - full
-truncate-and-reload per table. This is the "direct link" method, contrasted
-with the dlt-managed methods used for Excel and Salesforce.
 
-Fully dynamic, same philosophy as the Excel pipeline: the table list is not
-hardcoded anywhere in this script. Every run queries Postgres for whatever
-tables actually exist in the 'public' schema right now and loads all of
-them. Add a table in Odoo, it shows up next run with no code change. Drop
-one, it's just gone from the next run. No column renaming, no filtering,
-no reshaping - SELECT * and load as-is.
-
-Note: Odoo's public schema includes ~400-600 tables, most of them internal
-Odoo system tables (ir_*, mail_*, translation/log tables, etc), not just
-business data. This will be slower and noisier than the Excel run. Odoo
-stores translated fields (name, comment, etc) as JSONB, which come back as
-Python dicts - these are converted to JSON strings before insert since
-SQL Server has no native way to receive a raw dict as a parameter (see
-make_json_safe below). Any other genuinely incompatible table (huge binary
-blobs, exotic types) still gets logged and skipped rather than stopping
-the run.
-
-Handles:
-- Schema drift (tables): the table list itself is discovered fresh every
-  run from information_schema, not hardcoded.
-- Schema drift (columns): "SELECT *" plus a table rebuild (first chunk
-  replaces the target table) means whatever columns exist in a table right
-  now are exactly what lands in SQL Server.
-- Crashes: each table is extracted/loaded independently. If one table fails
-  it's logged and the script moves on to the rest instead of dying. Exits
-  non-zero at the end if anything failed, so a scheduler can flag it.
-- Memory: every table is streamed in chunks via pandas' chunksize, so large
-  tables don't need to fit in RAM all at once.
-- Transient connection errors are retried with backoff before a table (or
-  the initial table-list query) is given up on.
-"""
 
 import logging
 import sys

@@ -1,28 +1,4 @@
-"""
-Ingestion method 1 of 3: FILE -> dlt -> SQL Server
 
-Fully dynamic, no manual transformation: every sheet in the workbook becomes
-its own raw table in SQL Server (schema: raw_excel). Sheets aren't filtered
-or hardcoded by name - whatever sheets exist in the file right now get
-loaded, so adding/removing/renaming a sheet needs no code change here.
-
-Column names and values are passed through exactly as pandas reads them -
-nothing is renamed, retyped, or reshaped in this script. dlt's own naming
-convention does automatically turn e.g. "Loan Book 2018-2019" into the table
-name loan_book_2018_2019 and "Customer Name" into the column customer_name
-when it writes to SQL Server - that's dlt normalizing identifiers so they're
-valid SQL, not a transformation applied here.
-
-Resilience:
-- schema_contract="evolve" + write_disposition="replace" per sheet: a sheet
-  gaining/losing a column, or the workbook gaining/losing a whole sheet,
-  doesn't crash the run.
-- retry on file/sheet reads: the source lives in OneDrive, which frequently
-  throws PermissionError/OSError while a file is syncing or not yet fully
-  downloaded locally.
-- each sheet loads independently; if one sheet fails, the rest still load
-  and the failure is logged and reported at the end.
-"""
 
 import logging
 import sys

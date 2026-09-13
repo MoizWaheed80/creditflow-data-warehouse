@@ -5,3 +5,4 @@ simple-salesforce
 psycopg2-binary
 sqlalchemy
 pyodbc
+tenacity

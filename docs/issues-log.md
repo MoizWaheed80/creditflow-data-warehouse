@@ -42,6 +42,14 @@
 - TCP/IP protocol was disabled for SQLEXPRESS in SQL Server Configuration Manager (SQL Express installs with only Shared Memory enabled locally by default). Enabled it under SQL Server Network Configuration -> Protocols for SQLEXPRESS.
 - Named instances listen on a random dynamic port, not 1433, unless one is explicitly set. Set a fixed port by clearing "TCP Dynamic Ports" and setting "TCP Port" to `1433` under the TCP/IP protocol's IP Addresses -> IPAll section, then restarted the SQL Server (SQLEXPRESS) service for the change to take effect.
 
+### 4. `MissingDependencyException` — pyarrow not installed
+**Issue:** Pipeline failed at `step=extract` for every sheet with `dlt.common.exceptions.MissingDependencyException`, requiring pyarrow to load pandas DataFrames.
+**Solution:** `pip install "dlt[parquet]"`.
+
+### 5. `ArrowTypeError` / `ArrowInvalid` — mixed data types within a column
+**Issue:** Two sheets failed to load even after pyarrow was installed. `SF_Accounts` failed on `Created_Date` (mix of real dates and text in the same column), `Odoo_Invoices` failed on `Amount_Due` (mix of numbers and comma-formatted strings like `'2,188,447'`). pyarrow can't infer one consistent type per column when the values are inconsistent.
+**Solution:** Forced every column to load as string on ingest with `dtype=str` in the `pd.read_excel(...)` call. Keeps it a raw pass-through (no data loss/transformation), just stops pyarrow from guessing a type and choking on the mix. All 9 sheets loaded successfully after this.
+
 ## Salesforce
 
 ### 1. SOAP login disabled on the org

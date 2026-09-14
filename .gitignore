@@ -21,4 +21,4 @@ venv/
 Thumbs.db
 
 # Power BI local cache
-*.pbix.bak
+*.pbix.bak*.log

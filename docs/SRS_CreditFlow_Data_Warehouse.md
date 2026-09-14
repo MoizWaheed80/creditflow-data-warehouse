@@ -1,14 +1,23 @@
 # Software Requirements Specification
 ## CreditFlow Digital Lending Operations Warehouse
 
-**Version:** 2.0
+**Version:** 3.0
 **Author:** Abdul Moiz Waheed
-**Status:** Draft — Revision 2 (updated to match actual implementation)
+**Status:** Draft — Revision 3 (all three ingestion pipelines complete and verified)
 
 ---
 
-## Revision Notes (v1 → v2)
+## Revision Notes
 
+### v2 → v3
+All three ingestion pipelines are now built, run against live sources, and verified:
+- **Excel:** all 10 sheets loaded.
+- **Odoo:** 363/363 tables loaded (was previously "built, not yet run").
+- **Salesforce:** 1084/1126 objects loaded; scope also widened from the originally planned Accounts/Contacts/Opportunities to a fully dynamic discovery of every queryable object in the org via `describe()`. Authentication required a full rewrite to OAuth 2.0 Client Credentials Flow, since this org has both SOAP login and the standard OAuth username-password flow disabled. The 42 unreached objects are Salesforce metadata/access-computation objects that no tool can bulk-query (mandatory per-record filter by platform design) — documented and explicitly skipped rather than treated as failures.
+- The Odoo leg's scope also widened from the originally planned `res_partner`/`account_move` to a fully dynamic discovery of every table in the Postgres database (~360 tables), not a hardcoded list.
+- Section 3 and Functional Requirements statuses below updated accordingly. Silver/Gold layers, Power BI, RLS, and orchestration remain not started.
+
+### v1 → v2
 Three things changed between planning and build, and this revision reflects reality rather than the original plan:
 
 1. **CRM source is Salesforce, not HubSpot.** The project moved to Salesforce Developer Edition early in implementation. All CRM references below are updated accordingly.
@@ -42,6 +51,7 @@ Branch operations managers, loan portfolio analysts, a compliance/governance rev
 | RLS | Row-Level Security |
 | PII | Personally Identifiable Information |
 | KYC | Know Your Customer (identity/verification fields) |
+| OAuth CC Flow | OAuth 2.0 Client Credentials Flow — the auth method used for the Salesforce connection (see Revision Notes, v2→v3) |
 | Medallion Architecture | Bronze (raw) / Silver (conformed) / Gold (business marts) layering |
 
 ---
@@ -70,8 +80,9 @@ A new, standalone analytics platform. It reads from source systems on a schedule
 
 ### 2.5 Assumptions and Dependencies
 - All source data is synthetic/seeded, not real customer data.
-- Salesforce Developer Edition's API limits (e.g. 15,000 API calls/24hr) are sufficient for a demo-scale dataset.
+- Salesforce Developer Edition's API limits (e.g. 15,000 API calls/24hr) are sufficient for a demo-scale dataset — confirmed in practice: a full 1126-object discovery run stays within budget, and incremental extraction on subsequent runs uses a small fraction of that.
 - Odoo is ingested via a direct PostgreSQL connection to its underlying database, bypassing the Odoo API layer entirely. This is only feasible because the instance is self-hosted with direct DB access — a hosted/managed Odoo instance would not allow this and would require the API instead.
+- This org's Salesforce security settings (SOAP login disabled, OAuth username-password flow disabled) meant the standard simple-salesforce auth path did not work; OAuth 2.0 Client Credentials Flow was required instead (see Revision Notes, v2→v3, and the issues log for the full troubleshooting path).
 
 ---
 
@@ -79,23 +90,25 @@ A new, standalone analytics platform. It reads from source systems on a schedule
 
 | Source | System | Data Extracted | Ingestion Method | Frequency |
 |---|---|---|---|---|
-| Loan pipeline | Salesforce (CRM) | Accounts, Contacts, Opportunities — loan applicants, deal stages, loan officer/branch (via record owner), amount requested | dlt (REST API via simple-salesforce), with incremental extraction on Opportunity | Daily (target); currently run on-demand |
-| Vendor operations | Odoo (ERP, self-hosted Postgres) | `res_partner` (customers/vendors), `account_move` (invoices) — table list expected to grow as the ERP data model is finalized | Direct DB-to-DB: Python reads Postgres via psycopg2 and writes to SQL Server via SQLAlchemy/pyodbc, no orchestration framework | Daily (target); currently run on-demand |
+| Loan pipeline | Salesforce (CRM) | All queryable objects in the org, discovered dynamically via `describe()` (no hardcoded list) — includes Accounts, Contacts, Opportunities, and everything else the org exposes | dlt (REST API via simple-salesforce), OAuth 2.0 Client Credentials Flow auth, with incremental extraction per-object wherever `LastModifiedDate` exists (full replace otherwise) | Daily (target); currently run on-demand |
+| Vendor operations | Odoo (ERP, self-hosted Postgres) | All tables in the Postgres database, discovered dynamically via `information_schema` (no hardcoded list) — ~360 tables including `res_partner`, `account_move`, and Odoo's internal tables | Direct DB-to-DB: Python reads Postgres via psycopg2 in chunks and writes to SQL Server via SQLAlchemy/pyodbc, no orchestration framework | Daily (target); currently run on-demand |
 | Legacy ledger + CRM/ERP seed data | Excel — single workbook (`Legacy_Excel.xlsx`) | Multiple sheets: `Loan Book <year range>` (true legacy ledger, one sheet per period, 2018–2023) plus staging sheets used to originally seed Salesforce (`SF_Accounts`, `SF_Contacts`, `SF_Opportunities`) and Odoo (`Odoo_Customers`, `Odoo_SalesOrders`, `Odoo_Invoices`) | dlt (Python: pandas/openpyxl); every sheet in the workbook is discovered dynamically and loaded as its own raw table, no hardcoded sheet list | Weekly (target); currently run on-demand |
 
-All three sources currently land as raw, untransformed tables (one table per sheet/object) — this satisfies FR-1 (staging layer). Silver/Gold conformance (FR-2, FR-3) has not been built yet.
+All three sources currently land as raw, untransformed tables (one table per sheet/object/table) — this satisfies FR-1 (staging layer) in full. Silver/Gold conformance (FR-2, FR-3) has not been built yet.
+
+**Known limitation:** 42 Salesforce objects (out of 1126 discovered) cannot be loaded by any bulk-query tool — they are metadata/access-computation objects (e.g. `UserFieldAccess`, `EntityParticle`, `Vote`) that Salesforce requires a mandatory per-record filter for. These are explicitly skipped and logged, not silently dropped. See issues log for detail.
 
 ---
 
 ## 4. Functional Requirements
 
-- **FR-1:** The system shall ingest data from all three sources listed above into a staging layer without transformation. — *Implemented for Excel; Salesforce and Odoo scripts built but not yet run against live sources.*
+- **FR-1:** The system shall ingest data from all three sources listed above into a staging layer without transformation. — *Implemented for all three sources: Excel (10/10 sheets), Odoo (363/363 tables), Salesforce (1084/1126 objects, 42 skipped as known non-bulk-queryable).*
 - **FR-2:** The system shall conform staged data into a Silver layer with standardized types, deduplicated keys, and consistent branch/officer identifiers across sources. — *Not started.*
 - **FR-3:** The system shall build a Gold-layer star schema with fact tables for loan pipeline events and vendor payments, and shared dimensions for branch, loan officer, and date. — *Not started.*
 - **FR-4:** The system shall expose a Power BI report including: disbursal time by branch, default/decline rate by branch, vendor AR aging, and loan pipeline funnel by stage. — *Not started.*
 - **FR-5:** The Power BI report shall include a dedicated mobile layout for at least the executive summary page. — *Not started.*
 - **FR-6:** The system shall enforce row-level security so a Branch Manager role sees only their own branch's data. — *Not started.*
-- **FR-7:** The system shall run automated data quality checks after each load and log failures. — *Partially implemented at the ingestion level: each script retries transient failures, isolates per-table/per-object/per-sheet failures so one bad unit doesn't block the rest, and logs to a per-pipeline log file with a non-zero exit code on any failure. No dedicated post-load QA suite yet.*
+- **FR-7:** The system shall run automated data quality checks after each load and log failures. — *Partially implemented at the ingestion level: each script retries transient failures, isolates per-table/per-object/per-sheet failures so one bad unit doesn't block the rest, and logs to a per-pipeline log file with a non-zero exit code on any real failure. The Salesforce pipeline additionally distinguishes known, documented platform limitations (the 42 skipped objects) from genuine failures in its run summary, so the log accurately reflects what needs attention. No dedicated post-load QA suite yet.*
 
 ## 5. Non-Functional Requirements
 
@@ -124,13 +137,13 @@ Odoo (ERP)       ──direct───┼──> Raw/Staging (SQL Server) ──
 Excel (workbook) ──dlt──────┘
 ```
 
-Current state: Raw/Staging layer only, and only the Excel leg is confirmed working end-to-end. QA checks between Bronze→Silver and Silver→Gold are planned but not built, since those layers don't exist yet. Full architecture diagram to be added to the repo README.
+Current state: Raw/Staging layer only, but now **all three legs are confirmed working end-to-end** against live sources (Excel, Odoo, and Salesforce). QA checks between Bronze→Silver and Silver→Gold are planned but not built, since those layers don't exist yet. Full architecture diagram to be added to the repo README.
 
 ---
 
 ## 8. Success Metrics / Acceptance Criteria
 
-- All three sources ingesting on schedule with zero manual intervention for 2 consecutive weeks. — *Not started (no scheduler yet); Excel ingestion is functionally complete and repeatable on demand.*
+- All three sources ingesting on schedule with zero manual intervention for 2 consecutive weeks. — *Not started (no scheduler yet); all three pipelines are functionally complete and repeatable on demand.*
 - QA suite catches at least one seeded bad-data scenario during testing (proves the checks actually work, not just exist).
 - Power BI report loads correctly under each of the four defined RLS roles, showing only permitted data.
 - Mobile layout renders correctly on a phone-sized viewport.

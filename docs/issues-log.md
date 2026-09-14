@@ -26,6 +26,10 @@
 **Issue:** Bulk load was silently dropping tables — ended at 313/363 tables loaded, with translated-field tables (Odoo stores multi-language fields like `name={'en_US': 'Dollars'}`) failing. pyodbc can't bind a raw Python dict or list as a parameter.
 **Solution:** Added a `make_json_safe()` helper that converts any dict/list-valued column to a JSON string before the SQL Server insert. This was the fix that took the run from 313/363 to a full **363/363 tables loaded**.
 
+### 7. Scoping the direct-load table list — nonexistent and empty tables
+**Issue:** After narrowing `odoo_direct_load.py` down from all 363 tables to just the ones actually needed, `sale_order` and `sale_order_line` failed with `psycopg2.errors.UndefinedTable` (relation does not exist), while `product_template`, `product_product`, and `account_payment` ran fine but loaded 0 rows.
+**Solution:** Two different causes. `UndefinedTable` meant the Sales app was never installed in Odoo, those tables only get created when that module is installed, not something fixable client-side. The 0-row tables existed but were never seeded, the seed script created vendor bills directly via `account.move`/`account.move.line` without linking products or recording payments. Final table list trimmed to what was actually seeded: `res_partner`, `account_move`, `account_move_line`, plus `account_account` (not seeded, but pulled in raw anyway since bill lines reference it via `account_id`, resolved as a join during the warehouse build rather than filtered out at ingestion).
+
 ## Excel / dlt Pipeline
 
 ### 1. `ModuleNotFoundError: No module named 'openpyxl'`

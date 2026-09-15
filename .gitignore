@@ -12,13 +12,19 @@ __pycache__/
 venv/
 .venv/
 
+
 # IDE
 .vscode/
 .idea/
+.vs/
+bin/
+obj/
 
 # OS junk
 .DS_Store
 Thumbs.db
 
+
 # Power BI local cache
-*.pbix.bak*.log
+*.pbix.bak
+*.log

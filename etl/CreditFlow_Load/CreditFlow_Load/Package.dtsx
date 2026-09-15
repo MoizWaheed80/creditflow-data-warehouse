@@ -1,0 +1,103 @@
+﻿<?xml version="1.0"?>
+<DTS:Executable xmlns:DTS="www.microsoft.com/SqlServer/Dts"
+  DTS:refId="Package"
+  DTS:CreationDate="9/15/2026 3:03:43 PM"
+  DTS:CreationName="Microsoft.Package"
+  DTS:CreatorComputerName="ABDUL_MOIZ"
+  DTS:CreatorName="ABDUL_MOIZ\thecl"
+  DTS:DTSID="{539EF312-3C86-4DF5-B9A7-444EF649DA33}"
+  DTS:ExecutableType="Microsoft.Package"
+  DTS:LastModifiedProductVersion="17.0.1016.0"
+  DTS:LocaleID="1033"
+  DTS:ObjectName="Package"
+  DTS:PackageType="5"
+  DTS:VersionBuild="4"
+  DTS:VersionGUID="{D5E5E7A9-06F9-4333-9737-6F8143FEF4FD}">
+  <DTS:Property
+    DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:Variables />
+  <DTS:Executables>
+    <DTS:Executable
+      DTS:refId="Package\Excel Load"
+      DTS:CreationName="Microsoft.ExecuteProcess"
+      DTS:Description="Execute Process Task"
+      DTS:DTSID="{AABC259E-DCCF-4E6C-8DF6-0D57AE61F1CC}"
+      DTS:ExecutableType="Microsoft.ExecuteProcess"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Excel Load"
+      DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <ExecuteProcessData
+          Executable="C:\Users\thecl\AppData\Local\Microsoft\WindowsApps\python.exe"
+          Arguments="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\excel_pipeline.py"
+          WorkingDirectory="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\Odoo Load"
+      DTS:CreationName="Microsoft.ExecuteProcess"
+      DTS:Description="Execute Process Task"
+      DTS:DTSID="{5f35f35b-4a71-4de9-b0ad-12be49eab526}"
+      DTS:ExecutableType="Microsoft.ExecuteProcess"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Odoo Load"
+      DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="2">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <ExecuteProcessData
+          Executable="C:\Users\thecl\AppData\Local\Microsoft\WindowsApps\python.exe"
+          Arguments="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\odoo_direct_load.py"
+          WorkingDirectory="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\SalesForce Load"
+      DTS:CreationName="Microsoft.ExecuteProcess"
+      DTS:Description="Execute Process Task"
+      DTS:DTSID="{d352f15b-2cb4-4df5-8242-3e4a87168262}"
+      DTS:ExecutableType="Microsoft.ExecuteProcess"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="SalesForce Load"
+      DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="1">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <ExecuteProcessData
+          Executable="C:\Users\thecl\AppData\Local\Microsoft\WindowsApps\python.exe"
+          Arguments="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\salesforce_pipeline.py"
+          WorkingDirectory="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+  </DTS:Executables>
+  <DTS:DesignTimeProperties><![CDATA[<?xml version="1.0"?>
+<!--This CDATA section contains the layout information of the package. The section includes information such as (x,y) coordinates, width, and height.-->
+<!--If you manually edit this section and make a mistake, you can delete it. -->
+<!--The package will still be able to load normally but the previous layout information will be lost and the designer will automatically re-arrange the elements on the design surface.-->
+<Objects
+  Version="8">
+  <!--Each node below will contain properties that do not affect runtime behavior.-->
+  <Package
+    design-time-name="Package">
+    <LayoutInfo>
+      <GraphLayout
+        Capacity="4" xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph">
+        <NodeLayout
+          Size="152,60"
+          Id="Package\Excel Load"
+          TopLeft="126,63" />
+        <NodeLayout
+          Size="156,60"
+          Id="Package\Odoo Load"
+          TopLeft="404,64" />
+        <NodeLayout
+          Size="164,61"
+          Id="Package\SalesForce Load"
+          TopLeft="679,65" />
+      </GraphLayout>
+    </LayoutInfo>
+  </Package>
+</Objects>]]></DTS:DesignTimeProperties>
+</DTS:Executable>

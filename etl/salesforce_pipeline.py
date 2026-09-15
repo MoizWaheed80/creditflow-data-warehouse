@@ -54,7 +54,7 @@ def build_resource(sf: Salesforce, object_name: str, fields: list):
 def run():
     sf = get_client()
     pipeline = dlt.pipeline(
-        pipeline_name="salesforce_to_sqlserver",
+        pipeline_name="salesforce_bronze",
         destination="mssql",
         dataset_name=TARGET_DATASET
     )

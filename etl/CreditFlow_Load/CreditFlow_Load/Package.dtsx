@@ -11,10 +11,24 @@
   DTS:LocaleID="1033"
   DTS:ObjectName="Package"
   DTS:PackageType="5"
-  DTS:VersionBuild="4"
-  DTS:VersionGUID="{D5E5E7A9-06F9-4333-9737-6F8143FEF4FD}">
+  DTS:VersionBuild="15"
+  DTS:VersionGUID="{9B959D5D-3647-4AA1-A717-3CCABC672E2F}">
   <DTS:Property
     DTS:Name="PackageFormatVersion">8</DTS:Property>
+  <DTS:ConnectionManagers>
+    <DTS:ConnectionManager
+      DTS:refId="Package.ConnectionManagers[CreditFlow.Databaseconnect]"
+      DTS:CreationName="OLEDB"
+      DTS:DTSID="{9689C310-FA93-452B-88D6-E03452AFCAE1}"
+      DTS:ObjectName="CreditFlow.Databaseconnect">
+      <DTS:ObjectData>
+        <DTS:ConnectionManager
+          DTS:ConnectRetryCount="1"
+          DTS:ConnectRetryInterval="5"
+          DTS:ConnectionString="Data Source=localhost\SQLEXPRESS;Initial Catalog=creditflow-data-warehouse;Provider=MSOLEDBSQL.1;Integrated Security=SSPI;Auto Translate=False;Application Name=SSIS-Package-{9689C310-FA93-452B-88D6-E03452AFCAE1}localhost\SQLEXPRESS.localhost\SQLEXPRESS;" />
+      </DTS:ObjectData>
+    </DTS:ConnectionManager>
+  </DTS:ConnectionManagers>
   <DTS:Variables />
   <DTS:Executables>
     <DTS:Executable
@@ -30,9 +44,60 @@
       <DTS:Variables />
       <DTS:ObjectData>
         <ExecuteProcessData
-          Executable="C:\Users\thecl\AppData\Local\Microsoft\WindowsApps\python.exe"
+          Executable="   C:\Users\thecl\AppData\Local\Programs\Python\Python311\python.exe"
           Arguments="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\excel_pipeline.py"
           WorkingDirectory="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\Log Excel"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:Description="Execute SQL Task"
+      DTS:DTSID="{234C2034-26EA-45BB-B2C1-583A490BDE24}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Log Excel"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="0">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{9689C310-FA93-452B-88D6-E03452AFCAE1}"
+          SQLTask:SqlStatementSource="INSERT INTO bronze.etl_run_log (source_name, status, ended_at) VALUES ('Excel', 'Success', GETDATE());" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\Log Odoo"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:Description="Execute SQL Task"
+      DTS:DTSID="{ef931979-9dfb-4fcd-a0f0-2dd3bd48fec6}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Log Odoo"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="1">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{9689C310-FA93-452B-88D6-E03452AFCAE1}"
+          SQLTask:SqlStatementSource="INSERT INTO bronze.etl_run_log (source_name, status, ended_at) VALUES ('Odoo', 'Success', GETDATE());" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
+      </DTS:ObjectData>
+    </DTS:Executable>
+    <DTS:Executable
+      DTS:refId="Package\Log SalesForce"
+      DTS:CreationName="Microsoft.ExecuteSQLTask"
+      DTS:Description="Execute SQL Task"
+      DTS:DTSID="{c536faac-f49a-4e53-8320-658bc54c8c56}"
+      DTS:ExecutableType="Microsoft.ExecuteSQLTask"
+      DTS:LocaleID="-1"
+      DTS:ObjectName="Log SalesForce"
+      DTS:TaskContact="Execute SQL Task; Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
+      DTS:ThreadHint="2">
+      <DTS:Variables />
+      <DTS:ObjectData>
+        <SQLTask:SqlTaskData
+          SQLTask:Connection="{9689C310-FA93-452B-88D6-E03452AFCAE1}"
+          SQLTask:SqlStatementSource="INSERT INTO bronze.etl_run_log (source_name, status, ended_at) VALUES ('SalesForce', 'Success', GETDATE());" xmlns:SQLTask="www.microsoft.com/sqlserver/dts/tasks/sqltask" />
       </DTS:ObjectData>
     </DTS:Executable>
     <DTS:Executable
@@ -44,11 +109,11 @@
       DTS:LocaleID="-1"
       DTS:ObjectName="Odoo Load"
       DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
-      DTS:ThreadHint="2">
+      DTS:ThreadHint="1">
       <DTS:Variables />
       <DTS:ObjectData>
         <ExecuteProcessData
-          Executable="C:\Users\thecl\AppData\Local\Microsoft\WindowsApps\python.exe"
+          Executable="   C:\Users\thecl\AppData\Local\Programs\Python\Python311\python.exe"
           Arguments="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\odoo_direct_load.py"
           WorkingDirectory="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl" />
       </DTS:ObjectData>
@@ -62,16 +127,42 @@
       DTS:LocaleID="-1"
       DTS:ObjectName="SalesForce Load"
       DTS:TaskContact="Execute Process Task;Microsoft Corporation; SQL Server 2025; © 2025 Microsoft Corporation; All Rights Reserved;http://www.microsoft.com/sql/support/default.asp;1"
-      DTS:ThreadHint="1">
+      DTS:ThreadHint="2">
       <DTS:Variables />
       <DTS:ObjectData>
         <ExecuteProcessData
-          Executable="C:\Users\thecl\AppData\Local\Microsoft\WindowsApps\python.exe"
-          Arguments="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\salesforce_pipeline.py"
+          Executable="   C:\Users\thecl\AppData\Local\Programs\Python\Python311\python.exe"
+          Arguments="   C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl\salesforce_pipeline.py"
           WorkingDirectory="C:\Users\thecl\OneDrive\Desktop\creditflow-data-warehouse\etl" />
       </DTS:ObjectData>
     </DTS:Executable>
   </DTS:Executables>
+  <DTS:PrecedenceConstraints>
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[Constraint]"
+      DTS:CreationName=""
+      DTS:DTSID="{C8932363-8F96-4BE2-9437-885363852DC1}"
+      DTS:From="Package\SalesForce Load"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="Constraint"
+      DTS:To="Package\Log SalesForce" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[Constraint 1]"
+      DTS:CreationName=""
+      DTS:DTSID="{651D1D80-CED7-4447-AD86-FD5C01FCB67E}"
+      DTS:From="Package\Odoo Load"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="Constraint 1"
+      DTS:To="Package\Log Odoo" />
+    <DTS:PrecedenceConstraint
+      DTS:refId="Package.PrecedenceConstraints[Constraint 2]"
+      DTS:CreationName=""
+      DTS:DTSID="{DBD39926-6A1E-4354-BE9F-6F8F21A9F0B5}"
+      DTS:From="Package\Excel Load"
+      DTS:LogicalAnd="True"
+      DTS:ObjectName="Constraint 2"
+      DTS:To="Package\Log Excel" />
+  </DTS:PrecedenceConstraints>
   <DTS:DesignTimeProperties><![CDATA[<?xml version="1.0"?>
 <!--This CDATA section contains the layout information of the package. The section includes information such as (x,y) coordinates, width, and height.-->
 <!--If you manually edit this section and make a mistake, you can delete it. -->
@@ -83,19 +174,133 @@
     design-time-name="Package">
     <LayoutInfo>
       <GraphLayout
-        Capacity="4" xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph">
+        Capacity="16" xmlns="clr-namespace:Microsoft.SqlServer.IntegrationServices.Designer.Model.Serialization;assembly=Microsoft.SqlServer.IntegrationServices.Graph" xmlns:mssgle="clr-namespace:Microsoft.SqlServer.Graph.LayoutEngine;assembly=Microsoft.SqlServer.Graph" xmlns:assembly="http://schemas.microsoft.com/winfx/2006/xaml">
         <NodeLayout
           Size="152,60"
           Id="Package\Excel Load"
-          TopLeft="126,63" />
+          TopLeft="154,101" />
+        <NodeLayout
+          Size="127,42"
+          Id="Package\Log Excel"
+          TopLeft="299,214" />
+        <NodeLayout
+          Size="127,42"
+          Id="Package\Log Odoo"
+          TopLeft="565,214" />
+        <NodeLayout
+          Size="156,42"
+          Id="Package\Log SalesForce"
+          TopLeft="831,218" />
         <NodeLayout
           Size="156,60"
           Id="Package\Odoo Load"
-          TopLeft="404,64" />
+          TopLeft="461,101" />
         <NodeLayout
           Size="164,61"
           Id="Package\SalesForce Load"
-          TopLeft="679,65" />
+          TopLeft="722,103" />
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[Constraint]"
+          TopLeft="804,164">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="105,54"
+              Start="0,0"
+              End="105,46.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,23" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,23"
+                    Point2="0,27"
+                    Point3="4,27" />
+                  <mssgle:LineSegment
+                    End="101,27" />
+                  <mssgle:CubicBezierSegment
+                    Point1="101,27"
+                    Point2="105,27"
+                    Point3="105,31" />
+                  <mssgle:LineSegment
+                    End="105,46.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[Constraint 1]"
+          TopLeft="539,161">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="89.5,53"
+              Start="0,0"
+              End="89.5,45.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,22.5" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,22.5"
+                    Point2="0,26.5"
+                    Point3="4,26.5" />
+                  <mssgle:LineSegment
+                    End="85.5,26.5" />
+                  <mssgle:CubicBezierSegment
+                    Point1="85.5,26.5"
+                    Point2="89.5,26.5"
+                    Point3="89.5,30.5" />
+                  <mssgle:LineSegment
+                    End="89.5,45.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
+        <EdgeLayout
+          Id="Package.PrecedenceConstraints[Constraint 2]"
+          TopLeft="230,161">
+          <EdgeLayout.Curve>
+            <mssgle:Curve
+              StartConnector="{assembly:Null}"
+              EndConnector="132.5,53"
+              Start="0,0"
+              End="132.5,45.5">
+              <mssgle:Curve.Segments>
+                <mssgle:SegmentCollection
+                  Capacity="5">
+                  <mssgle:LineSegment
+                    End="0,22.5" />
+                  <mssgle:CubicBezierSegment
+                    Point1="0,22.5"
+                    Point2="0,26.5"
+                    Point3="4,26.5" />
+                  <mssgle:LineSegment
+                    End="128.5,26.5" />
+                  <mssgle:CubicBezierSegment
+                    Point1="128.5,26.5"
+                    Point2="132.5,26.5"
+                    Point3="132.5,30.5" />
+                  <mssgle:LineSegment
+                    End="132.5,45.5" />
+                </mssgle:SegmentCollection>
+              </mssgle:Curve.Segments>
+            </mssgle:Curve>
+          </EdgeLayout.Curve>
+          <EdgeLayout.Labels>
+            <EdgeLabelCollection />
+          </EdgeLayout.Labels>
+        </EdgeLayout>
       </GraphLayout>
     </LayoutInfo>
   </Package>

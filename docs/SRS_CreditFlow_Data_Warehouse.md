@@ -1,13 +1,21 @@
 # Software Requirements Specification
 ## CreditFlow Digital Lending Operations Warehouse
 
-**Version:** 3.0
+**Version:** 4.0
 **Author:** Abdul Moiz Waheed
-**Status:** Draft — Revision 3 (all three ingestion pipelines complete and verified)
+**Status:** Draft — Revision 4 (all three ingestion pipelines + daily orchestration complete and verified)
 
 ---
 
 ## Revision Notes
+
+### v3 → v4
+Two changes since v3:
+
+1. **Ingestion scope narrowed to what's actually seeded.** The v3 build discovered and pulled entire schemas dynamically (363/363 Odoo tables, 1084/1126 Salesforce objects). This was deliberately scoped down: Salesforce now loads only Account, Contact, and Opportunity; Odoo now loads only `res_partner`, `account_move`, `account_move_line`, and `account_account`. Excel is unchanged (all 9 sheets). All three land in a single consolidated `bronze` schema with source-prefixed table names (`excel_*`, `odoo_*`, `salesforce_*`), replacing the earlier separate raw schemas. The 42-skipped-Salesforce-objects limitation documented in v3 no longer applies at this scope, since full-org discovery is no longer attempted.
+2. **Orchestration/scheduling is now implemented.** An SSIS package (`CreditFlow_Load`) wraps all three Python scripts as Execute Process Tasks, deployed to the SSISDB catalog and run daily at 2 AM via a SQL Server Agent job, under a dedicated local service account (`svc_ssis`) rather than a personal login. Each load logs to a `bronze.etl_run_log` table. This required a second SQL Server instance (a default-instance SQL Server 2025 Developer Edition install) purely to host the SSISDB catalog and Agent, since SQL Server Express — which hosts the actual warehouse data — supports neither. See the issues log for the full permissions/DNS troubleshooting path.
+
+Section 2.4, Section 3, Functional Requirements, and Section 8 below are updated accordingly.
 
 ### v2 → v3
 All three ingestion pipelines are now built, run against live sources, and verified:
@@ -17,14 +25,14 @@ All three ingestion pipelines are now built, run against live sources, and verif
 - The Odoo leg's scope also widened from the originally planned `res_partner`/`account_move` to a fully dynamic discovery of every table in the Postgres database (~360 tables), not a hardcoded list.
 - Section 3 and Functional Requirements statuses below updated accordingly. Silver/Gold layers, Power BI, RLS, and orchestration remain not started.
 
+*(Note, per v3→v4 above: the full-dynamic-discovery scope described in this note was subsequently narrowed back down to only the seeded tables/objects.)*
+
 ### v1 → v2
 Three things changed between planning and build, and this revision reflects reality rather than the original plan:
 
 1. **CRM source is Salesforce, not HubSpot.** The project moved to Salesforce Developer Edition early in implementation. All CRM references below are updated accordingly.
-2. **SSIS was dropped in favor of direct Python ingestion.** Both the Odoo and Excel sources were originally planned to go through SSIS. In practice, everything was built in Python instead: dlt for Excel and Salesforce, and a direct psycopg2/SQLAlchemy script for Odoo (bypassing the Odoo API layer and reading its Postgres database directly). This keeps the whole ingestion layer in one language, makes schema-drift handling and testing easier, and was a deliberate choice to practice both an API-based ingestion pattern (Salesforce) and a direct DB-to-DB pattern (Odoo) side by side.
+2. **SSIS was dropped in favor of direct Python ingestion.** Both the Odoo and Excel sources were originally planned to go through SSIS. In practice, everything was built in Python instead: dlt for Excel and Salesforce, and a direct psycopg2/SQLAlchemy script for Odoo (bypassing the Odoo API layer and reading its Postgres database directly). This keeps the whole ingestion layer in one language, makes schema-drift handling and testing easier, and was a deliberate choice to practice both an API-based ingestion pattern (Salesforce) and a direct DB-to-DB pattern (Odoo) side by side. *(Note, per v3→v4 above: SSIS was later reintroduced, but purely as an orchestration/scheduling layer wrapping these same Python scripts — the ingestion logic itself is still 100% Python.)*
 3. **The Excel source is one workbook with a broader role than originally scoped.** It's not just a manual branch tracker — it's a single workbook (`Legacy_Excel.xlsx`) containing both the true legacy loan-book ledgers *and* the staging data used to seed the Salesforce and Odoo instances. Section 3 reflects the real sheet structure.
-
-SSIS is retained in the glossary for reference since it may still be introduced later for orchestration/scheduling, but it is not part of the ingestion layer as currently built.
 
 ---
 
@@ -47,7 +55,7 @@ Branch operations managers, loan portfolio analysts, a compliance/governance rev
 | ERP | Enterprise Resource Planning (Odoo, internal ops) |
 | CRM | Customer Relationship Management (Salesforce, loan pipeline) |
 | ETL/ELT | Extract-Transform-Load / Extract-Load-Transform |
-| SSIS | SQL Server Integration Services — originally planned for ERP/Excel ingestion, not used in the current build (see Revision Notes) |
+| SSIS | SQL Server Integration Services — used for daily orchestration/scheduling of the three Python ingestion scripts (see Revision Notes, v3→v4); the ingestion logic itself remains Python, not SSIS Data Flow |
 | RLS | Row-Level Security |
 | PII | Personally Identifiable Information |
 | KYC | Know Your Customer (identity/verification fields) |
@@ -73,16 +81,16 @@ A new, standalone analytics platform. It reads from source systems on a schedule
 ### 2.4 Operating Environment
 - SQL Server Express (local instance, named instance `SQLEXPRESS`) as the warehouse — database `creditflow-data-warehouse`, Windows Authentication
 - Python scripts for all ingestion: dlt for Excel and Salesforce, a direct psycopg2/SQLAlchemy script for Odoo
-- Orchestration/scheduling not yet implemented — SQL Server Agent or Windows Task Scheduler planned
+- Orchestration/scheduling implemented via an SSIS package (`CreditFlow_Load`) deployed to the SSISDB catalog and run daily (2 AM) by a SQL Server Agent job, under a dedicated local service account (`svc_ssis`). This requires a second, separate SQL Server instance (default-instance SQL Server 2025 Developer Edition) purely to host the SSISDB catalog and Agent, since SQL Server Express supports neither — the warehouse data itself stays on the original SQLEXPRESS instance.
 - Power BI Desktop + Power BI Service for publishing
 - Self-hosted Odoo Community Edition (Docker) as the ERP source
 - Salesforce Developer Edition (free tier) as the CRM source
 
 ### 2.5 Assumptions and Dependencies
 - All source data is synthetic/seeded, not real customer data.
-- Salesforce Developer Edition's API limits (e.g. 15,000 API calls/24hr) are sufficient for a demo-scale dataset — confirmed in practice: a full 1126-object discovery run stays within budget, and incremental extraction on subsequent runs uses a small fraction of that.
 - Odoo is ingested via a direct PostgreSQL connection to its underlying database, bypassing the Odoo API layer entirely. This is only feasible because the instance is self-hosted with direct DB access — a hosted/managed Odoo instance would not allow this and would require the API instead.
 - This org's Salesforce security settings (SOAP login disabled, OAuth username-password flow disabled) meant the standard simple-salesforce auth path did not work; OAuth 2.0 Client Credentials Flow was required instead (see Revision Notes, v2→v3, and the issues log for the full troubleshooting path).
+- Scheduled runs execute under a dedicated Windows service account (`svc_ssis`) rather than a personal login, so the schedule does not depend on any specific person being signed in.
 
 ---
 
@@ -90,33 +98,33 @@ A new, standalone analytics platform. It reads from source systems on a schedule
 
 | Source | System | Data Extracted | Ingestion Method | Frequency |
 |---|---|---|---|---|
-| Loan pipeline | Salesforce (CRM) | All queryable objects in the org, discovered dynamically via `describe()` (no hardcoded list) — includes Accounts, Contacts, Opportunities, and everything else the org exposes | dlt (REST API via simple-salesforce), OAuth 2.0 Client Credentials Flow auth, with incremental extraction per-object wherever `LastModifiedDate` exists (full replace otherwise) | Daily (target); currently run on-demand |
-| Vendor operations | Odoo (ERP, self-hosted Postgres) | All tables in the Postgres database, discovered dynamically via `information_schema` (no hardcoded list) — ~360 tables including `res_partner`, `account_move`, and Odoo's internal tables | Direct DB-to-DB: Python reads Postgres via psycopg2 in chunks and writes to SQL Server via SQLAlchemy/pyodbc, no orchestration framework | Daily (target); currently run on-demand |
-| Legacy ledger + CRM/ERP seed data | Excel — single workbook (`Legacy_Excel.xlsx`) | Multiple sheets: `Loan Book <year range>` (true legacy ledger, one sheet per period, 2018–2023) plus staging sheets used to originally seed Salesforce (`SF_Accounts`, `SF_Contacts`, `SF_Opportunities`) and Odoo (`Odoo_Customers`, `Odoo_SalesOrders`, `Odoo_Invoices`) | dlt (Python: pandas/openpyxl); every sheet in the workbook is discovered dynamically and loaded as its own raw table, no hardcoded sheet list | Weekly (target); currently run on-demand |
+| Loan pipeline | Salesforce (CRM) | Account, Contact, Opportunity (scoped to the objects actually seeded, not a full-org discovery) | dlt (REST API via simple-salesforce), OAuth 2.0 Client Credentials Flow auth | Daily, 2 AM — SQL Server Agent job running the SSIS package |
+| Vendor operations | Odoo (ERP, self-hosted Postgres) | `res_partner`, `account_move`, `account_move_line`, `account_account` (scoped to the tables actually seeded) | Direct DB-to-DB: Python reads Postgres via psycopg2 in chunks and writes to SQL Server via SQLAlchemy/pyodbc | Daily, 2 AM — SQL Server Agent job running the SSIS package |
+| Legacy ledger + CRM/ERP seed data | Excel — single workbook (`Legacy_Excel.xlsx`) | All 9 sheets: `Loan Book <year range>` (true legacy ledger, one sheet per period, 2018–2023) plus staging sheets originally used to seed Salesforce (`SF_Accounts`, `SF_Contacts`, `SF_Opportunities`) and Odoo (`Odoo_Customers`, `Odoo_SalesOrders`, `Odoo_Invoices`) | dlt (Python: pandas/openpyxl); every sheet loaded as its own raw table | Daily, 2 AM — SQL Server Agent job running the SSIS package |
 
-All three sources currently land as raw, untransformed tables (one table per sheet/object/table) — this satisfies FR-1 (staging layer) in full. Silver/Gold conformance (FR-2, FR-3) has not been built yet.
-
-**Known limitation:** 42 Salesforce objects (out of 1126 discovered) cannot be loaded by any bulk-query tool — they are metadata/access-computation objects (e.g. `UserFieldAccess`, `EntityParticle`, `Vote`) that Salesforce requires a mandatory per-record filter for. These are explicitly skipped and logged, not silently dropped. See issues log for detail.
+All three sources land as raw, untransformed tables in a single `bronze` schema (source-prefixed: `excel_*`, `odoo_*`, `salesforce_*`) — this satisfies FR-1 (staging layer) in full. Silver/Gold conformance (FR-2, FR-3) has not been built yet.
 
 ---
 
 ## 4. Functional Requirements
 
-- **FR-1:** The system shall ingest data from all three sources listed above into a staging layer without transformation. — *Implemented for all three sources: Excel (10/10 sheets), Odoo (363/363 tables), Salesforce (1084/1126 objects, 42 skipped as known non-bulk-queryable).*
+- **FR-1:** The system shall ingest data from all three sources listed above into a staging layer without transformation. — *Implemented for all three sources and running on an automated daily schedule: Excel (9/9 sheets), Odoo (4/4 seeded tables), Salesforce (3/3 seeded objects), all landing in the `bronze` schema.*
 - **FR-2:** The system shall conform staged data into a Silver layer with standardized types, deduplicated keys, and consistent branch/officer identifiers across sources. — *Not started.*
 - **FR-3:** The system shall build a Gold-layer star schema with fact tables for loan pipeline events and vendor payments, and shared dimensions for branch, loan officer, and date. — *Not started.*
 - **FR-4:** The system shall expose a Power BI report including: disbursal time by branch, default/decline rate by branch, vendor AR aging, and loan pipeline funnel by stage. — *Not started.*
 - **FR-5:** The Power BI report shall include a dedicated mobile layout for at least the executive summary page. — *Not started.*
 - **FR-6:** The system shall enforce row-level security so a Branch Manager role sees only their own branch's data. — *Not started.*
-- **FR-7:** The system shall run automated data quality checks after each load and log failures. — *Partially implemented at the ingestion level: each script retries transient failures, isolates per-table/per-object/per-sheet failures so one bad unit doesn't block the rest, and logs to a per-pipeline log file with a non-zero exit code on any real failure. The Salesforce pipeline additionally distinguishes known, documented platform limitations (the 42 skipped objects) from genuine failures in its run summary, so the log accurately reflects what needs attention. No dedicated post-load QA suite yet.*
+- **FR-7:** The system shall run automated data quality checks after each load and log failures. — *Partially implemented at the ingestion level: each script retries transient failures, isolates per-table/per-object/per-sheet failures so one bad unit doesn't block the rest, and logs to a per-pipeline log file with a non-zero exit code on any real failure. SSIS additionally logs every run's outcome per source to `bronze.etl_run_log`, giving a durable, queryable success/failure history across runs. No dedicated post-load QA suite yet.*
+- **FR-8 (new):** The system shall run all ingestion on an unattended daily schedule with no manual intervention. — *Implemented: SSIS package `CreditFlow_Load` deployed to the SSISDB catalog, run daily at 2 AM by a SQL Server Agent job under a dedicated service account (`svc_ssis`); 16+ consecutive successful runs logged as of this revision.*
 
 ## 5. Non-Functional Requirements
 
-- **NFR-1 (Performance):** Daily loads shall complete within a defined window (e.g., under 30 minutes) so morning reporting is available on schedule. — *Not yet measured; no scheduler in place.*
+- **NFR-1 (Performance):** Daily loads shall complete within a defined window (e.g., under 30 minutes) so morning reporting is available on schedule. — *Comfortably met: all three legs combined complete in well under a minute per run (observed ~15–20 seconds), based on `bronze.etl_run_log` timestamps.*
 - **NFR-2 (Data Quality):** No Gold-layer fact table row may be missing a required dimension key; QA checks shall block promotion to Gold on failure. — *N/A until Gold layer exists.*
 - **NFR-3 (Security):** RLS shall be enforced at the Power BI model level, not just filtered in visuals. — *Not started.*
-- **NFR-4 (Auditability):** Every table shall be traceable to its source system and load timestamp via metadata columns. — *Partially satisfied: dlt automatically adds `_dlt_load_id` and `_dlt_id` metadata columns to every loaded table for Excel and Salesforce. The direct Odoo script does not yet add equivalent load metadata — worth adding a load-timestamp column there for parity.*
+- **NFR-4 (Auditability):** Every table shall be traceable to its source system and load timestamp via metadata columns. — *Partially satisfied: dlt automatically adds `_dlt_load_id` and `_dlt_id` metadata columns to every loaded table for Excel and Salesforce. The direct Odoo script does not yet add equivalent load metadata — worth adding a load-timestamp column there for parity. `bronze.etl_run_log` separately tracks load-level (not row-level) run history for all three sources.*
 - **NFR-5 (Maintainability):** All ETL logic shall be version-controlled in Git with a documented rollback path. — *ETL scripts are in Git (`etl/`); documented rollback path not yet written.*
+- **NFR-6 (Reliability, new):** Scheduled runs shall not depend on any individual user's Windows session being active. — *Implemented: the SQL Server Agent job runs under a dedicated local service account (`svc_ssis`), independent of any personal login.*
 
 ---
 
@@ -131,19 +139,35 @@ All three sources currently land as raw, untransformed tables (one table per she
 ## 7. System Architecture (Overview)
 
 ```
-Salesforce (CRM) ──dlt──────┐
-Odoo (ERP)       ──direct───┼──> Raw/Staging (SQL Server) ──> Bronze ──> Silver ──> Gold (star schema) ──> Power BI (+ mobile layout, RLS)
-                   Python
-Excel (workbook) ──dlt──────┘
+                    SQL Server Agent (daily, 2 AM)
+                             │
+                    SSIS package: CreditFlow_Load
+                    (runs as svc_ssis service account)
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+Salesforce (CRM) ──dlt──┐    │    ┌──direct── Odoo (ERP)
+                         │    │    │
+                         └────┼────┘
+                              │
+                    Excel (workbook) ──dlt──┘
+                              │
+                              ▼
+                  bronze schema (SQL Server)
+                  excel_* / odoo_* / salesforce_*
+                  + bronze.etl_run_log
+                              │
+                              ▼
+                    Silver ──> Gold (star schema) ──> Power BI (+ mobile layout, RLS)
 ```
 
-Current state: Raw/Staging layer only, but now **all three legs are confirmed working end-to-end** against live sources (Excel, Odoo, and Salesforce). QA checks between Bronze→Silver and Silver→Gold are planned but not built, since those layers don't exist yet. Full architecture diagram to be added to the repo README.
+Current state: Bronze/Raw layer complete and running on an automated daily schedule, confirmed working end-to-end against live sources (Excel, Odoo, and Salesforce). QA checks between Bronze→Silver and Silver→Gold are planned but not built, since those layers don't exist yet. Full architecture diagram to be added to the repo README.
 
 ---
 
 ## 8. Success Metrics / Acceptance Criteria
 
-- All three sources ingesting on schedule with zero manual intervention for 2 consecutive weeks. — *Not started (no scheduler yet); all three pipelines are functionally complete and repeatable on demand.*
+- All three sources ingesting on schedule with zero manual intervention for 2 consecutive weeks. — *In progress: SQL Server Agent job now runs daily; 16+ consecutive successful runs logged in `bronze.etl_run_log` as of this revision, with the unattended-schedule clock now running toward the 2-week target.*
 - QA suite catches at least one seeded bad-data scenario during testing (proves the checks actually work, not just exist).
 - Power BI report loads correctly under each of the four defined RLS roles, showing only permitted data.
 - Mobile layout renders correctly on a phone-sized viewport.

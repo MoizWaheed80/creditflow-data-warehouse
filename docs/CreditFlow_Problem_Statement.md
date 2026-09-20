@@ -6,22 +6,25 @@ CreditFlow's lending data is scattered across three disconnected systems — Sal
 
 ## Solution
 
-Built a Python ingestion layer that lands all three sources into a SQL Server warehouse, deliberately covering two different ingestion patterns rather than one:
+Built a Python ingestion layer that lands all three sources into a single SQL Server `bronze` schema (source-prefixed tables: `excel_*`, `odoo_*`, `salesforce_*`), deliberately covering two different ingestion patterns rather than one:
 
-- **Excel → dlt → SQL Server** — file-based ingestion. Every sheet in the workbook is discovered dynamically (no hardcoded sheet list); each becomes its own raw table.
-- **Salesforce → dlt → SQL Server** — API-based ingestion. Every queryable object in the org is discovered dynamically via `describe()` (no hardcoded object list), with per-object field discovery and incremental extraction wherever a `LastModifiedDate` field exists (full replace otherwise). Authenticates via OAuth 2.0 Client Credentials Flow, since this org has both SOAP login and the username-password OAuth flow disabled. Retry/backoff on rate limits and session errors, per-object failure isolation, and an explicit skip-list for the small set of Salesforce metadata objects that can never be bulk-queried by any tool (they require a mandatory per-record filter by platform design).
-- **Odoo → SQL Server, direct** — no framework. A Python script discovers every table in Odoo's Postgres database dynamically via `information_schema` (no hardcoded table list, covering ~360 tables), reads via psycopg2 in chunks, and writes to SQL Server via SQLAlchemy/pyodbc, full refresh per table. Converts Odoo's JSONB translated-field columns to JSON strings so they can bind through pyodbc.
+- **Excel → dlt → SQL Server** — file-based ingestion. Every sheet in the workbook is loaded as its own raw table: three years of legacy loan-book ledgers (2018–2023) plus the original staging sheets used to seed Salesforce and Odoo.
+- **Salesforce → dlt → SQL Server** — API-based ingestion of Account, Contact, and Opportunity. Authenticates via OAuth 2.0 Client Credentials Flow, since this org has both SOAP login and the username-password OAuth flow disabled. Retry/backoff on rate limits and session errors, per-object failure isolation.
+- **Odoo → SQL Server, direct** — no framework. A Python script reads `res_partner`, `account_move`, `account_move_line`, and `account_account` directly from Odoo's Postgres database via psycopg2, writes to SQL Server via SQLAlchemy/pyodbc, full refresh per table. Converts Odoo's JSONB translated-field columns to JSON strings so they can bind through pyodbc.
 
-Every pipeline has retry-with-backoff, per-unit failure isolation (one bad sheet/object/table doesn't kill the whole run), and logging — so it survives real-world conditions (OneDrive file locks, flaky connections, schema drift, platform-level query restrictions) rather than only working in the happy path.
+An earlier version of the Odoo and Salesforce legs discovered and pulled entire schemas dynamically with no scoping (800+ Odoo tables, hundreds of Salesforce objects). This was deliberately narrowed down to only the tables/objects actually seeded with data, keeping the warehouse focused rather than carrying hundreds of empty tables.
 
-SSIS was in the original plan for the Odoo and Excel legs but got dropped in favor of a single Python codebase — one language, one testable pipeline, and dlt's built-in schema-evolution handling instead of maintaining separate SSIS packages.
+Every pipeline has retry-with-backoff, per-unit failure isolation (one bad sheet/object/table doesn't kill the whole run), and logging — so it survives real-world conditions (OneDrive file locks, flaky connections, schema drift) rather than only working in the happy path.
+
+**Orchestration:** All three scripts are now orchestrated by an SSIS package (`CreditFlow_Load`) deployed to a SQL Server Agent job that runs daily at 2 AM, with each load logged to a `bronze.etl_run_log` table. The job runs the scripts under a dedicated local service account (`svc_ssis`), so the schedule doesn't depend on anyone being signed in.
 
 ## Status
 
-All three ingestion pipelines are complete and verified working end-to-end against live sources:
+All three ingestion pipelines and the daily orchestration are complete and verified working end-to-end against live sources:
 
-- **Excel:** all 10 sheets loaded successfully.
-- **Odoo:** 363/363 tables loaded successfully.
-- **Salesforce:** 1084/1126 objects loaded; the remaining 42 are Salesforce metadata/access-computation objects with no bulk-query path (documented platform limitation, not a pipeline defect) and are cleanly logged as skipped rather than failed.
+- **Excel:** all 9 sheets loaded successfully.
+- **Odoo:** all 4 seeded tables loaded successfully (`res_partner`, `account_move`, `account_move_line`, `account_account`).
+- **Salesforce:** Account, Contact, and Opportunity loaded successfully via OAuth 2.0 Client Credentials Flow.
+- **Orchestration:** SQL Server Agent job runs the SSIS package daily; 16+ consecutive successful runs logged in `bronze.etl_run_log` with zero manual intervention.
 
-Next: Silver/Gold layer transformations, Power BI reporting on top of the warehouse, row-level security so a branch manager only sees their own branch's data, and orchestration/scheduling for recurring runs.
+Next: Silver/Gold layer transformations, Power BI reporting on top of the warehouse, row-level security so a branch manager only sees their own branch's data.
